@@ -21,10 +21,14 @@ module.exports = async (req, res) => {
       })
     );
     if (req.method !== "POST") {
+      // Health / preflight probe: the platform requires exactly this
+      // signed JSON: {"ok":true,"protocolVersion":"v1"}.
       const body = Buffer.from(
-        JSON.stringify({ ok: true, status: "healthy", agent: "bosowa-gatekeeper" })
+        JSON.stringify({ ok: true, protocolVersion: "v1" })
       );
       res.setHeader("content-type", "application/json");
+      const sig = signResponse(body);
+      if (sig) res.setHeader("x-agent-games-signature", sig);
       return res.status(200).send(body);
     }
     const out = await handleRawRequest(rawBody, req.headers);
