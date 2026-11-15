@@ -1,1 +1,1 @@
-{"functions":{"api/agent.js":{"includeFiles":"circuits/**","maxDuration":60}}}
+{"functions":{"api/agent.js":{"includeFiles":"circuits/**","maxDuration":10}}}
