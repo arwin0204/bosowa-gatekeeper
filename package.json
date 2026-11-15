@@ -1,0 +1,1 @@
+{"dependencies":{"snarkjs":"0.7.6"},"description":"Proof Gatekeeper agent for zkVerify Agent Games — bosowa123","license":"MIT","main":"server.js","name":"bosowa-gatekeeper","scripts":{"start":"node server.js","test":"node test-local.js"},"version":"1.0.0"}
