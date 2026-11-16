@@ -2,6 +2,8 @@
 // Usage: AGENT_GAMES_HMAC_SECRET=test-secret node server.js
 // Then: curl -X POST localhost:3000/agent -d '<task json>' -H 'x-agent-games-signature: <hmac>'
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 const { handleRawRequest, signResponse } = require("./lib/gatekeeper");
 
 const PORT = process.env.PORT || 3000;
@@ -13,6 +15,20 @@ const server = http.createServer(async (req, res) => {
   const rawBody = Buffer.concat(chunks);
   console.log("REQ", req.method, req.url, "headers:", JSON.stringify(req.headers));
   console.log("BODY:", rawBody.toString("utf8").slice(0, 2000));
+  // K5 test pages: serve static /k5-*.html files from the repo root.
+  // Does not touch /api/agent or any other route.
+  if (req.method === "GET") {
+    const urlPath = decodeURIComponent(req.url.split("?")[0]);
+    if (urlPath.startsWith("/k5-") && urlPath.endsWith(".html")) {
+      const filePath = path.join(__dirname, urlPath);
+      if (filePath.startsWith(__dirname + path.sep) && fs.existsSync(filePath)) {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        return res.end(fs.readFileSync(filePath));
+      }
+      res.writeHead(404, { "content-type": "text/plain" });
+      return res.end("not found");
+    }
+  }
   if (req.method !== "POST") {
     const body = Buffer.from(
       JSON.stringify({ ok: true, status: "healthy", agent: "bosowa-gatekeeper" })
