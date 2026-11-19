@@ -59,6 +59,10 @@ async function main() {
   check("preflight response signed", checkSig(r.text, r.sig));
 
   // 2. Valid task -> APPROVE with valid proof
+  // Real tasks carry proof_vk + registered_vk (must match for APPROVE).
+  // The test previously omitted them, so decide() always failed the VK
+  // check and every task REJECTed. Use the tournament VK hash for both.
+  const VK = "0x6b79c6012a6d8651f3e13bc4d2a20370280ab49700c90c5316d4168bfbad77b0";
   const valid = {
     taskId: "task-001",
     minimum: 1000,
@@ -69,14 +73,24 @@ async function main() {
     conditionRecipient: ADDR,
     amount: 500,
     maxTransfer: 1000,
+    proofVk: VK,
+    registeredVk: VK,
   };
   const t0 = Date.now();
   r = await post(valid);
   const ms = Date.now() - t0;
   j = JSON.parse(r.text);
   check("valid task 200", r.status === 200);
-  check("valid task decision=1", j.decision === 1);
+  check("valid task decision=1", j.decision === "APPROVE");
   check("valid task proof verifies", (await verifyProof(j)) === "OK");
+  // 2026-11-19 fix: proof must carry ONLY pi_a/pi_b/pi_c (no
+  // snarkjs `protocol`/`curve` fields) or the platform's on-chain
+  // verifier may reject it during serialization.
+  check(
+    "proof has only pi_a/pi_b/pi_c",
+    !!j.proof &&
+      Object.keys(j.proof).sort().join(",") === "pi_a,pi_b,pi_c"
+  );
   check("valid task response signed", checkSig(r.text, r.sig));
   console.log(`      approve round-trip: ${ms} ms`);
 
@@ -84,7 +98,7 @@ async function main() {
   const trap = { ...valid, taskId: "task-002", recipient: OTHER };
   r = await post(trap);
   j = JSON.parse(r.text);
-  check("trap task decision=0", j.decision === 0);
+  check("trap task decision=0", j.decision === "REJECT");
   check("trap task proof verifies", (await verifyProof(j)) === "OK");
 
   // 4. Replay: same taskId as #2 -> byte-identical cached response
@@ -104,14 +118,14 @@ async function main() {
   const expired = { ...valid, taskId: "task-003", expiryBlock: 8410000 };
   r = await post(expired);
   j = JSON.parse(r.text);
-  check("expired task decision=0", j.decision === 0);
+  check("expired task decision=0", j.decision === "REJECT");
   check("expired task proof verifies", (await verifyProof(j)) === "OK");
 
   // 8. Amount over cap -> REJECT
   const overcap = { ...valid, taskId: "task-004", amount: 1500 };
   r = await post(overcap);
   j = JSON.parse(r.text);
-  check("over-cap task decision=0", j.decision === 0);
+  check("over-cap task decision=0", j.decision === "REJECT");
 
   server.kill();
   const failed = results.filter(([, ok]) => !ok);
